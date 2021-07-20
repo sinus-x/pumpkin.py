@@ -70,11 +70,11 @@ class LogEntry:
         self,
         stack: List[traceback.FrameSummary],
         scope: str,
-        level: str,
+        level: LogLevel,
         actor: LogActor,
         source: LogSource,
         message: str,
-        extra: dict = dict(),
+        **extra: dict,
     ):
         self.timestamp = datetime.datetime.now()
         self.scope = scope
@@ -88,7 +88,7 @@ class LogEntry:
 
     def __str__(self):
         return (
-            f"{utils.Time.datetime(self.timestamp)}"
+            f"{utils.Time.datetime(self.timestamp)} "
             f"{self.level} {self.stack[-1].name} "
             f"({getattr(self.actor, 'name', '?')} in {getattr(self.channel, 'name', '?')}) "
             f"{self.message}"
@@ -101,7 +101,7 @@ class LogEntry:
             "lineno": self.lineno,
             "scope": self.scope,
             "module": self.module,
-            "level": self.level,
+            "levelstr": self.levelstr,
             "levelno": self.levelno,
             "actor_id": self.actor_id,
             "guild_id": self.guild_id,
@@ -119,7 +119,7 @@ class LogEntry:
         """
         stubs: List[str] = list()
 
-        stubs.append(self.level)
+        stubs.append(self.levelstr)
         if self.actor_name != "None":
             stubs.append(self.actor_name)
         if self.channel_name != "None":
@@ -127,7 +127,12 @@ class LogEntry:
         if self.guild_name != "None":
             stubs.append(f"({self.guild_name})")
 
-        return " ".join(stubs) + f": {self.message}"
+        message = " ".join(stubs) + f": {self.message}"
+
+        if "traceback" in self.extra.keys():
+            message += "\n" + "".join(self.extra["traceback"])
+
+        return message
 
     def format_stderr(self):
         """Format entry so it can be sent to log file.
@@ -135,18 +140,8 @@ class LogEntry:
         This is similar to :meth:`format_discord`, but it also contains time
         information.
         """
-        stubs: List[str] = list()
-
-        stubs.append(utils.Time.datetime(self.timestamp))
-        stubs.append(self.level)
-        if self.actor_name != "None":
-            stubs.append(self.actor_name)
-        if self.channel_name != "None":
-            stubs.append(f"#{self.channel_name}")
-        if self.guild_name != "None":
-            stubs.append(f"({self.guild_name})")
-
-        return " ".join(stubs) + f": {self.message}"
+        timestamp: str = utils.Time.datetime(self.timestamp)
+        return timestamp + " " + self.format_discord()
 
     @property
     def function(self):
@@ -189,9 +184,14 @@ class LogEntry:
         return getattr(self.channel, "name", str(self.channel_id))
 
     @property
+    def levelstr(self):
+        """Get log level in string representation."""
+        return self.level.name
+
+    @property
     def levelno(self):
         """Get log level in numeric representation."""
-        return getattr(LogLevel, self.level).value
+        return self.level.value
 
     @property
     def filename(self):
@@ -237,7 +237,7 @@ class Logger:
 
     async def _log(
         self,
-        level: str,
+        level: LogLevel,
         actor: LogActor,
         source: LogSource,
         message: str,
@@ -255,7 +255,7 @@ class Logger:
             actor,
             source,
             message,
-            extra,
+            **extra,
         )
 
         print(entry.format_stderr(), file=sys.stderr)  # noqa: T001
@@ -317,7 +317,7 @@ class Logger:
         **extra: dict,
     ):
         """Log event with DEBUG level."""
-        await self._log("DEBUG", actor, source, message, **extra)
+        await self._log(LogLevel.DEBUG, actor, source, message, **extra)
 
     async def info(
         self,
@@ -327,7 +327,7 @@ class Logger:
         **extra: dict,
     ):
         """Log event with INFO level."""
-        await self._log("INFO", actor, source, message, **extra)
+        await self._log(LogLevel.INFO, actor, source, message, **extra)
 
     async def warning(
         self,
@@ -337,7 +337,7 @@ class Logger:
         **extra: dict,
     ):
         """Log event with WARNING level."""
-        await self._log("WARNING", actor, source, message, **extra)
+        await self._log(LogLevel.WARNING, actor, source, message, **extra)
 
     async def error(
         self,
@@ -347,7 +347,7 @@ class Logger:
         **extra: dict,
     ):
         """Log event with ERROR level."""
-        await self._log("ERROR", actor, source, message, **extra)
+        await self._log(LogLevel.ERROR, actor, source, message, **extra)
 
     async def critical(
         self,
@@ -357,7 +357,7 @@ class Logger:
         **extra: dict,
     ):
         """Log event with CRITICAL level."""
-        await self._log("CRITICAL", actor, source, message, **extra)
+        await self._log(LogLevel.CRITICAL, actor, source, message, **extra)
 
 
 class Bot(Logger):
