@@ -231,6 +231,11 @@ class Admin(commands.Cog):
             )
         )
         tempdir.cleanup()
+        await bot_log.info(
+            ctx.author,
+            ctx.channel,
+            f"Repository {repository.name} installed.",
+        )
 
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.check(acl.check)
@@ -265,6 +270,7 @@ class Admin(commands.Cog):
         result = utils.Text.split(result, 1990)
         for r in result:
             await ctx.send("```" + r + "```")
+        await bot_log.info(ctx.author, ctx.channel, f"Repository {name} updated.")
 
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.check(acl.check)
@@ -308,6 +314,7 @@ class Admin(commands.Cog):
                 name=utils.Text.sanitise(name, limit=64),
             )
         )
+        await bot_log.info(ctx.author, ctx.channel, f"Repository {name} uninstalled.")
 
     @commands.check(acl.check)
     @commands.group(name="module")
@@ -339,23 +346,6 @@ class Admin(commands.Cog):
         self.bot.reload_extension("modules." + name + ".module")
         await ctx.send(tr("module reload", "reply", ctx, name=name))
         await bot_log.info(ctx.author, ctx.channel, "Reloaded " + name)
-
-    @commands.check(acl.check)
-    @commands.group(name="command")
-    async def command(self, ctx):
-        await utils.Discord.send_help(ctx)
-
-    @commands.check(acl.check)
-    @command.command(name="enable")
-    async def command_enable(self, ctx, *, name: str):
-        pass
-        # TODO Save state to database
-
-    @commands.check(acl.check)
-    @command.command(name="disable")
-    async def command_disable(self, ctx, *, name: str):
-        pass
-        # TODO Save state to database
 
     @commands.check(acl.check)
     @commands.group(name="config")
